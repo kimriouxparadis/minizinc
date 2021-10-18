@@ -31,7 +31,7 @@ function create_variable(interpreter::Interpreter, node::AST, trailer, m)
         error("Domain variable are not permited")
     elseif (typeof(type) == BasicType)
         if (type.name == int)
-            newVariable = SeaPearl.IntVar(0, 2, node.id, trailer)
+            newVariable = SeaPearl.IntVar(0, typemax(Int64), node.id, trailer)
             SeaPearl.addVariable!(m, newVariable)
             interpreter.GLOBAL_SCOPE[node.id] = newVariable
         elseif (type.name == bool)
@@ -110,6 +110,8 @@ function create_constraint(interpreter::Interpreter, constraint, trailer, m)
                 SeaPearl.addVariable!(m, variablesAssignees[i])
                 interpreter.GLOBAL_VARIABLE[variables_names[i].value*"_view"] = variablesAssignees[i]
             elseif (numbers[i] == -1)
+                println(variables[i].domain)
+                println(numbers[i])
                 push!(variablesAssignees, SeaPearl.IntVarViewOpposite(variables[i], variables_names[i].value*"_view"))
                 SeaPearl.addVariable!(m, variablesAssignees[i])
                 interpreter.GLOBAL_VARIABLE[variables_names[i].value*"_view"] = variablesAssignees[i]
@@ -122,8 +124,8 @@ function create_constraint(interpreter::Interpreter, constraint, trailer, m)
         end
         new_constraint_greater = SeaPearl.SumGreaterThan(variablesAssignees, constraint.expressions[3].value, trailer)
         new_constraint_lesser = SeaPearl.SumLessThan(variablesAssignees, constraint.expressions[3].value, trailer)
-        push!(m.constraints, new_constraint_greater)
-        push!(m.constraints, new_constraint_lesser)
+        SeaPearl.addConstraint!(m, new_constraint_greater)
+        SeaPearl.addConstraint!(m, new_constraint_lesser)
         push!(interpreter.GLOBAL_CONSTRAINT, new_constraint_greater)
         push!(interpreter.GLOBAL_CONSTRAINT, new_constraint_lesser)
 
@@ -412,7 +414,6 @@ end
 function create_solve(interpreter::Interpreter, solve_node, trailer, m)
     if (typeof(solve_node[1]) == Minimize)
         SeaPearl.addObjective!(m, interpreter.GLOBAL_VARIABLE[solve_node[1].expressions.value]) 
-        println(interpreter.GLOBAL_VARIABLE[solve_node[1].expressions.value])
        #= variableToMinimize = 
         negativeVariable = SeaPearl.IntVar(-variableToMinimize.domain.max.value, -variableToMinimize.domain.min.value, "optimization",trailer)
         SeaPearl.addVariable!(m, negativeVariable)
@@ -421,14 +422,15 @@ function create_solve(interpreter::Interpreter, solve_node, trailer, m)
         constraint = SeaPearl.Absolute(negativeVariable,variableToMinimize, trailer)
         push!(m.constraints, constraint)
         push!(interpreter.GLOBAL_CONSTRAINT, constraint)=#
-    elseif (typeof(solve_node) == Maximize)
-        variableToMMaximize = interpreter.GLOBAL_VARIABLE[solve_node[1].expressions.value]
-        negativeVariable = SeaPearl.IntVar(-variableToMMaximize.domain.max.value, -variableToMMaximize.domain.min.value, "optimization",trailer)
+    elseif (typeof(solve_node[1]) == Maximize)
+        println("ok")
+        variableToMaximize = interpreter.GLOBAL_VARIABLE[solve_node[1].expressions.value]
+        negativeVariable = SeaPearl.IntVar(-variableToMaximize.domain.max.value, -variableToMaximize.domain.min.value, "optimization",trailer)
         SeaPearl.addVariable!(m, negativeVariable)
         interpreter.GLOBAL_VARIABLE["optimization"] = negativeVariable
-        constraint = SeaPearl.Absolute(negativeVariable,variableToMMaximize, trailer)
-        SeaPearl.addObjective!(m,variableToMMaximize) 
-        push!(m.constraints, constraint)
+        constraint = SeaPearl.Absolute(negativeVariable, variableToMaximize, trailer)
+        SeaPearl.addObjective!(m, negativeVariable) 
+        SeaPearl.addConstraint!(m, constraint)
         push!(interpreter.GLOBAL_CONSTRAINT, constraint)
         interpreter.MINIMIZATION = false
     end
@@ -437,16 +439,8 @@ end
 
 function create_output(interpreter::Interpreter, m, node)
     output = ""
-    if interpreter.MINIMIZATION
-        goodSolution = findMinSolution(m.statistics.objectives)
-    else
-        goodSolution = findMaxSolution(m.statistics.objectives)
-    end
-    println(goodSolution)
+    goodSolution = findMinSolution(m.statistics.objectives)
     solution = m.statistics.solutions[goodSolution[1]]
-    for val in solution
-        println(val)
-    end
     for variable in node
         if (variable.annotations !== nothing)
             anns = variable.annotations.annotationsList
@@ -484,20 +478,6 @@ function findMinSolution(objectif)
     return (index, value)
 end
 
-function findMaxSolution(objectif)
-    index = 1
-    value = typemax(Int64)
-    for val in 1:length(objectif)
-        if objectif[val] !== nothing && objectif[val] > value
-            value = objectif[val]
-            index = val
-        end
-    end
-    println(index)
-    println(value)
-    return (index, value)
-end
-
 function create_model(model)
     lexer = Lexer(model)
     parser = Parser(lexer)
@@ -517,11 +497,19 @@ function create_model(model)
     
     create_solve(interpreter, node.solves, trailer, m)
 
-    for c in interpreter.GLOBAL_CONSTRAINT
-        println(c)
-    end
+
     variableSelection = SeaPearl.MinDomainVariableSelection{false}()
     SeaPearl.solve!(m; variableHeuristic=variableSelection,)
+    println(m.statistics.objectives)
+    for sol in m.statistics.solutions
+        println(sol)
+    end
+    for var in m.variables
+        println(var[2].domain)
+    end    
+    for var in m.constraints
+        println(var)
+    end
     create_output(interpreter, m, node.variables)
     return interpreter
 end
