@@ -110,8 +110,6 @@ function create_constraint(interpreter::Interpreter, constraint, trailer, m)
                 SeaPearl.addVariable!(m, variablesAssignees[i])
                 interpreter.GLOBAL_VARIABLE[variables_names[i].value*"_view"] = variablesAssignees[i]
             elseif (numbers[i] == -1)
-                println(variables[i].domain)
-                println(numbers[i])
                 push!(variablesAssignees, SeaPearl.IntVarViewOpposite(variables[i], variables_names[i].value*"_view"))
                 SeaPearl.addVariable!(m, variablesAssignees[i])
                 interpreter.GLOBAL_VARIABLE[variables_names[i].value*"_view"] = variablesAssignees[i]
@@ -423,7 +421,6 @@ function create_solve(interpreter::Interpreter, solve_node, trailer, m)
         push!(m.constraints, constraint)
         push!(interpreter.GLOBAL_CONSTRAINT, constraint)=#
     elseif (typeof(solve_node[1]) == Maximize)
-        println("ok")
         variableToMaximize = interpreter.GLOBAL_VARIABLE[solve_node[1].expressions.value]
         negativeVariable = SeaPearl.IntVar(-variableToMaximize.domain.max.value, -variableToMaximize.domain.min.value, "optimization",trailer)
         SeaPearl.addVariable!(m, negativeVariable)
@@ -500,16 +497,6 @@ function create_model(model)
 
     variableSelection = SeaPearl.MinDomainVariableSelection{false}()
     SeaPearl.solve!(m; variableHeuristic=variableSelection,)
-    println(m.statistics.objectives)
-    for sol in m.statistics.solutions
-        println(sol)
-    end
-    for var in m.variables
-        println(var[2].domain)
-    end    
-    for var in m.constraints
-        println(var)
-    end
     create_output(interpreter, m, node.variables)
     return interpreter
 end
