@@ -9,7 +9,8 @@ mutable struct Interpreter
     GLOBAL_PARAMETER::Dict
     MINIMIZATION::Bool
     output::String
-    Interpreter(node) = new(node, Dict(), [], Dict(), true, "")
+    viewVariable::Int64
+    Interpreter(node) = new(node, Dict(), [], Dict(), true, "", 0)
 end
 
 function error(message)
@@ -106,18 +107,29 @@ function create_constraint(interpreter::Interpreter, constraint, trailer, m)
             push!(numbers, multiplicator[i].value)
             push!(variables, interpreter.GLOBAL_VARIABLE[variables_names[i].value])
             if (numbers[i] > 0)
-                push!(variablesAssignees, SeaPearl.IntVarViewMul(variables[i], numbers[i], variables_names[i].value*"_view"))
+                push!(variablesAssignees, SeaPearl.IntVarViewMul(variables[i], numbers[i], "view_"*string(interpreter.viewVariable)))
                 SeaPearl.addVariable!(m, variablesAssignees[i])
-                interpreter.GLOBAL_VARIABLE[variables_names[i].value*"_view"] = variablesAssignees[i]
+                interpreter.GLOBAL_VARIABLE["view_"*string(interpreter.viewVariable)] = variablesAssignees[i]
+                interpreter.viewVariable += 1
             elseif (numbers[i] == -1)
-                push!(variablesAssignees, SeaPearl.IntVarViewOpposite(variables[i], variables_names[i].value*"_view"))
+                push!(variablesAssignees, SeaPearl.IntVarViewOpposite(variables[i], "view_"*string(interpreter.viewVariable)))
                 SeaPearl.addVariable!(m, variablesAssignees[i])
-                interpreter.GLOBAL_VARIABLE[variables_names[i].value*"_view"] = variablesAssignees[i]
+                interpreter.GLOBAL_VARIABLE["view_"*string(interpreter.viewVariable)] = variablesAssignees[i]
+                interpreter.viewVariable += 1
+
             elseif (numbers[i] < -1)
-                temps = SeaPearl.IntVarViewMul(variables[i], numbers[i], variables_names[i].value*"_view")
-                push!(variablesAssignees, SeaPearl.IntVarViewOpposite(temps, variables_names[i].value*"_view"))
-                SeaPearl.addVariable!(m, variablesAssignees[i])
-                interpreter.GLOBAL_VARIABLE[variables_names[i].value*"_view_neg"] = variablesAssignees[i]
+                mul1 = SeaPearl.IntVarViewMul(variables[i], numbers[i], "view_"*string(interpreter.viewVariable))
+                interpreter.GLOBAL_VARIABLE["view_"*string(interpreter.viewVariable)] = mul1
+                interpreter.viewVariable += 1
+
+                mul2 = SeaPearl.IntVarViewOpposite(mul1, "view_"*string(interpreter.viewVariable))
+                interpreter.GLOBAL_VARIABLE["view_"*string(interpreter.viewVariable)] = mul2
+                interpreter.viewVariable += 1
+
+                push!(variablesAssignees, mul2)
+                SeaPearl.addVariable!(m, mul2)
+                SeaPearl.addVariable!(m, mul1)
+
             end
         end
         new_constraint_greater = SeaPearl.SumGreaterThan(variablesAssignees, constraint.expressions[3].value, trailer)
@@ -194,20 +206,28 @@ function create_constraint(interpreter::Interpreter, constraint, trailer, m)
             push!(numbers, multiplicator[i].value)
             push!(variables, interpreter.GLOBAL_VARIABLE[variables_names[i].value])
             if (numbers[i] > 0)
-                push!(variablesAssignees, SeaPearl.IntVarViewMul(variables[i], numbers[i], variables_names[i].value*"_view"))
+                push!(variablesAssignees, SeaPearl.IntVarViewMul(variables[i], numbers[i], "view_"*string(interpreter.viewVariable)))
                 SeaPearl.addVariable!(m, variablesAssignees[i])
-                interpreter.GLOBAL_VARIABLE[variables_names[i].value*"_view"] = variablesAssignees[i]
+                interpreter.GLOBAL_VARIABLE["view_"*string(interpreter.viewVariable)] = variablesAssignees[i]
+                interpreter.viewVariable += 1
             elseif (numbers[i] == -1)
-                push!(variablesAssignees, SeaPearl.IntVarViewOpposite(variables[i], variables_names[i].value*"_view"))
+                push!(variablesAssignees, SeaPearl.IntVarViewOpposite(variables[i], "view_"*string(interpreter.viewVariable)))
                 SeaPearl.addVariable!(m, variablesAssignees[i])
-                interpreter.GLOBAL_VARIABLE[variables_names[i].value*"_view"] = variablesAssignees[i]
-                println(variablesAssignees[i])
+                interpreter.GLOBAL_VARIABLE["view_"*string(interpreter.viewVariable)] = variablesAssignees[i]
+                interpreter.viewVariable += 1
+
             elseif (numbers[i] < -1)
-                temps = SeaPearl.IntVarViewMul(variables[i], numbers[i], variables_names[i].value*"_view")
-                push!(variablesAssignees, SeaPearl.IntVarViewOpposite(temps, variables_names[i].value*"_view"))
-                SeaPearl.addVariable!(m, variablesAssignees[i])
-                interpreter.GLOBAL_VARIABLE[variables_names[i].value*"_view_neg"] = variablesAssignees[i]
-                println(variablesAssignees[i])
+                mul1 = SeaPearl.IntVarViewMul(variables[i], numbers[i], "view_"*string(interpreter.viewVariable))
+                interpreter.GLOBAL_VARIABLE["view_"*string(interpreter.viewVariable)] = mul1
+                interpreter.viewVariable += 1
+
+                mul2 = SeaPearl.IntVarViewOpposite(mul1, "view_"*string(interpreter.viewVariable))
+                interpreter.GLOBAL_VARIABLE["view_"*string(interpreter.viewVariable)] = mul2
+                interpreter.viewVariable += 1
+                
+                push!(variablesAssignees, mul2)
+                SeaPearl.addVariable!(m, mul2)
+                SeaPearl.addVariable!(m, mul1)
             end
         end
         new_constraint_lesser = SeaPearl.SumLessThan(variablesAssignees, constraint.expressions[3].value, trailer)
