@@ -166,11 +166,9 @@ function create_constraint(interpreter::Interpreter, constraint, trailer, m)
     elseif "int_le_reif"== constraint.id
         #=var int: a, var int: b, var bool: r
         Constrains ( a ≤ b ) ↔ r=#
-    elseif "int_lin_eq"== constraint.id
-        #=array [int] of int: as,
-        array [int] of var int: bs,
-        int: c      
-        Constrains c=∑ias[i]∗bs[i]=#
+  
+    
+
     elseif "int_lin_eq_reif"== constraint.id
         #=array [int] of int: as,
         array [int] of var int: bs,
@@ -183,6 +181,39 @@ function create_constraint(interpreter::Interpreter, constraint, trailer, m)
         array [int] of var int: bs,
         int: c
         Constrains ∑ as [ i ]* bs [ i ] ≤ c=#
+        if (typeof(constraint.expressions[1]) == BasicExpr)
+            multiplicator = interpreter.GLOBAL_PARAMETER[constraint.expressions[1].value]
+        else
+            multiplicator = constraint.expressions[1].values
+        end
+        variables_names = constraint.expressions[2].values
+        numbers = []
+        variables = []
+        variablesAssignees = SeaPearl.IntVarView[]
+        for i in 1:length(multiplicator)
+            push!(numbers, multiplicator[i].value)
+            push!(variables, interpreter.GLOBAL_VARIABLE[variables_names[i].value])
+            if (numbers[i] > 0)
+                push!(variablesAssignees, SeaPearl.IntVarViewMul(variables[i], numbers[i], variables_names[i].value*"_view"))
+                SeaPearl.addVariable!(m, variablesAssignees[i])
+                interpreter.GLOBAL_VARIABLE[variables_names[i].value*"_view"] = variablesAssignees[i]
+            elseif (numbers[i] == -1)
+                push!(variablesAssignees, SeaPearl.IntVarViewOpposite(variables[i], variables_names[i].value*"_view"))
+                SeaPearl.addVariable!(m, variablesAssignees[i])
+                interpreter.GLOBAL_VARIABLE[variables_names[i].value*"_view"] = variablesAssignees[i]
+                println(variablesAssignees[i])
+            elseif (numbers[i] < -1)
+                temps = SeaPearl.IntVarViewMul(variables[i], numbers[i], variables_names[i].value*"_view")
+                push!(variablesAssignees, SeaPearl.IntVarViewOpposite(temps, variables_names[i].value*"_view"))
+                SeaPearl.addVariable!(m, variablesAssignees[i])
+                interpreter.GLOBAL_VARIABLE[variables_names[i].value*"_view_neg"] = variablesAssignees[i]
+                println(variablesAssignees[i])
+            end
+        end
+        new_constraint_lesser = SeaPearl.SumLessThan(variablesAssignees, constraint.expressions[3].value, trailer)
+        println(new_constraint_lesser)
+        SeaPearl.addConstraint!(m, new_constraint_lesser)
+        push!(interpreter.GLOBAL_CONSTRAINT, new_constraint_lesser)
     elseif "int_lin_le_reif"== constraint.id
         #=array [int] of int: as,
         array [int] of var int: bs,
@@ -498,7 +529,7 @@ function create_model(model)
     variableSelection = SeaPearl.MinDomainVariableSelection{false}()
     SeaPearl.solve!(m; variableHeuristic=variableSelection,)
     create_output(interpreter, m, node.variables)
-    return interpreter
+    return (interpreter, m)
 end
 
 

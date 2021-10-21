@@ -827,7 +827,7 @@ end
         constraint fzn_all_different_int(mesvariables);
         solve  minimize X_INTRODUCED_2_;"
 
-        interpreter = create_model(model)
+        (interpreter,m) = create_model(model)
         @test length(interpreter.GLOBAL_VARIABLE) == 4
         @test interpreter.GLOBAL_VARIABLE["X_INTRODUCED_0_"].domain.min.value == 1
         @test interpreter.GLOBAL_VARIABLE["X_INTRODUCED_0_"].domain.max.value == 3
@@ -853,7 +853,7 @@ end
         constraint int_lin_eq([1,1,-1],[X_INTRODUCED_2_,X_INTRODUCED_1_,X_INTRODUCED_3_],0):: defines_var(X_INTRODUCED_3_);
         solve  minimize X_INTRODUCED_3_;"
 
-        interpreter = create_model(model)
+        (interpreter, m) = create_model(model)
         @test length(interpreter.GLOBAL_VARIABLE) == 8
         @test interpreter.GLOBAL_VARIABLE["X_INTRODUCED_0_"].domain.min.value == 1
         @test interpreter.GLOBAL_VARIABLE["X_INTRODUCED_0_"].domain.max.value == 4
@@ -866,6 +866,69 @@ end
         @test typeof(interpreter.GLOBAL_CONSTRAINT[1]) == SeaPearl.AllDifferent
 
     end
+
+
+    @testset "constraint" begin
+        @testset "int_lin_eq" begin
+            model = "predicate fzn_all_different_int(array [int] of var int: x);
+            array [1..2] of int: X_INTRODUCED_12_ = [1,-1];
+            var 1..10: X_INTRODUCED_0_;
+            var 1..10: X_INTRODUCED_1_;
+            var 1..10: X_INTRODUCED_2_;
+            var 1..10: X_INTRODUCED_3_;
+            var 3..10: X_INTRODUCED_4_;
+            var 1..10: X_INTRODUCED_5_;
+            var 1..10: X_INTRODUCED_6_;
+            var 1..10: X_INTRODUCED_7_;
+            var 1..10: X_INTRODUCED_8_;
+            var 2..20: X_INTRODUCED_9_:: is_defined_var;
+            array [1..9] of var int: mesvariables:: output_array([1..3,1..3]) = [X_INTRODUCED_0_,X_INTRODUCED_1_,X_INTRODUCED_2_,X_INTRODUCED_3_,X_INTRODUCED_4_,X_INTRODUCED_5_,X_INTRODUCED_6_,X_INTRODUCED_7_,X_INTRODUCED_8_];
+            array [1..9] of var int: X_INTRODUCED_11_ ::var_is_introduced  = [X_INTRODUCED_0_,X_INTRODUCED_1_,X_INTRODUCED_2_,X_INTRODUCED_3_,X_INTRODUCED_4_,X_INTRODUCED_5_,X_INTRODUCED_6_,X_INTRODUCED_7_,X_INTRODUCED_8_];
+            constraint fzn_all_different_int(X_INTRODUCED_11_);
+            constraint int_lin_le(X_INTRODUCED_12_,[X_INTRODUCED_0_,X_INTRODUCED_1_],0);
+            constraint int_lin_eq([1,1,-1],[X_INTRODUCED_8_,X_INTRODUCED_3_,X_INTRODUCED_9_],0):: defines_var(X_INTRODUCED_9_);
+            solve  maximize X_INTRODUCED_9_;"
+            
+            (interpreter, m) = create_model(model)
+
+            @test length(interpreter.GLOBAL_VARIABLE) == 18
+            @test length(interpreter.GLOBAL_PARAMETER) == 1
+
+            @test interpreter.GLOBAL_VARIABLE["X_INTRODUCED_0_"].domain.min.value == 1
+            @test interpreter.GLOBAL_VARIABLE["X_INTRODUCED_0_"].domain.max.value == 10
+            @test interpreter.GLOBAL_VARIABLE["X_INTRODUCED_1_"].domain.min.value == 1
+            @test interpreter.GLOBAL_VARIABLE["X_INTRODUCED_1_"].domain.max.value == 10
+            @test interpreter.GLOBAL_VARIABLE["X_INTRODUCED_2_"].domain.min.value == 1
+            @test interpreter.GLOBAL_VARIABLE["X_INTRODUCED_2_"].domain.max.value == 10
+            @test interpreter.GLOBAL_VARIABLE["X_INTRODUCED_3_"].domain.min.value == 1
+            @test interpreter.GLOBAL_VARIABLE["X_INTRODUCED_3_"].domain.max.value == 10            
+            @test interpreter.GLOBAL_VARIABLE["X_INTRODUCED_4_"].domain.min.value == 3
+            @test interpreter.GLOBAL_VARIABLE["X_INTRODUCED_4_"].domain.max.value == 10            
+            @test interpreter.GLOBAL_VARIABLE["X_INTRODUCED_5_"].domain.min.value == 1
+            @test interpreter.GLOBAL_VARIABLE["X_INTRODUCED_5_"].domain.max.value == 10           
+            @test interpreter.GLOBAL_VARIABLE["X_INTRODUCED_6_"].domain.min.value == 1
+            @test interpreter.GLOBAL_VARIABLE["X_INTRODUCED_6_"].domain.max.value == 10           
+            @test interpreter.GLOBAL_VARIABLE["X_INTRODUCED_7_"].domain.min.value == 1
+            @test interpreter.GLOBAL_VARIABLE["X_INTRODUCED_7_"].domain.max.value == 10           
+            @test interpreter.GLOBAL_VARIABLE["X_INTRODUCED_8_"].domain.min.value == 1
+            @test interpreter.GLOBAL_VARIABLE["X_INTRODUCED_8_"].domain.max.value == 10
+            @test interpreter.GLOBAL_VARIABLE["X_INTRODUCED_9_"].domain.min.value == 2
+            @test interpreter.GLOBAL_VARIABLE["X_INTRODUCED_9_"].domain.max.value == 20
+
+            objectif = filter(x -> x !== nothing, m.statistics.objectives)   
+            min = minimum(objectif)
+            pos = findall(x->x == min , m.statistics.objectives)
+            sol = m.statistics.solutions[pos]
+            @test sol[1]["X_INTRODUCED_9_"] == 19
+            for oneSol in  m.statistics.solutions
+                if (oneSol != nothing)
+                    @test oneSol["X_INTRODUCED_8_"] + oneSol["X_INTRODUCED_3_"] == oneSol["X_INTRODUCED_9_"]
+                    @test oneSol["X_INTRODUCED_0_"] <= oneSol["X_INTRODUCED_1_"]
+                end
+            end
+        end
+    end
+
 end
 
 
